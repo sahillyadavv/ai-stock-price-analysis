@@ -8,34 +8,35 @@ echo   InvestIQ - AI Stock Analysis
 echo  ================================
 echo.
 
-:: Start Backend
-echo  [1/3] Starting Backend...
-start "InvestIQ - Backend" cmd /k "cd /d C:\pollin-ai\backend && venv\Scripts\activate && uvicorn main:app --reload"
+:: Build frontend once if not already built
+if not exist "C:\pollin-ai\frontend\dist\index.html" (
+    echo  Building app for the first time...
+    echo  This takes 1-2 minutes but only happens ONCE.
+    echo.
+    cd /d C:\pollin-ai\frontend
+    call npm run build
+    echo.
+    echo  Build complete!
+    echo.
+)
 
-:: Wait for backend
-echo  [2/3] Waiting for backend (8 seconds)...
-timeout /t 8 /nobreak > nul
+:: Start backend silently in background
+echo  Starting InvestIQ...
+start /min "InvestIQ-Server" cmd /c "cd /d C:\pollin-ai\backend && venv\Scripts\activate && uvicorn main:app --host 0.0.0.0 --port 8000"
 
-:: Start Frontend
-echo  [3/3] Starting Frontend...
-start "InvestIQ - Frontend" cmd /k "cd /d C:\pollin-ai\frontend && npm run dev"
+:: Poll until server is ready (check every half second)
+echo  Waiting for server...
+:waitloop
+ping -n 1 localhost > nul 2>&1
+curl -s http://localhost:8000 > nul 2>&1
+if %errorlevel% neq 0 (
+    timeout /t 1 /nobreak > nul
+    goto waitloop
+)
 
-:: Wait for frontend to compile
-echo.
-echo  Waiting for frontend to compile (15 seconds)...
-timeout /t 15 /nobreak > nul
-
-:: Open browser
+:: Server is ready! Open browser instantly
 echo  Opening InvestIQ...
-start "" "http://localhost:5173"
-timeout /t 2 /nobreak > nul
-start "" "http://localhost:5175"
+start "" "http://localhost:8000"
 
-echo.
-echo  ================================
-echo   InvestIQ is now running!
-echo   Try: http://localhost:5173
-echo   Or:  http://localhost:5175
-echo  ================================
-echo.
-pause
+:: Close this window
+exit
